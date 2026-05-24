@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <File Path="src\README.md" />
+    <Project Path="src/Qyl.Playground/Qyl.Playground.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Qyl.Playground.Tests/Qyl.Playground.Tests.csproj" />
+  </Folder>
+</Solution>
