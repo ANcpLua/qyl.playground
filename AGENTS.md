@@ -1,6 +1,6 @@
-# Qyl.Playground — Agent Guidance
+# Agent guidance
 
-A .NET 10 lab for the 2026 observability stack against an agent-style workload. Treat it as a reference implementation for learning, not a production framework.
+Conventions for AI assistants and contributors working in this repo. `CLAUDE.md` is a symlink to this file.
 
 ## Build, test, run
 
@@ -10,41 +10,55 @@ dotnet test  Qyl.Playground.slnx --no-build
 dotnet run   --project src/Qyl.Playground -- --demo --duration 6 --parallelism 4
 ```
 
-The bounded demo prints two final snapshots: one from the raw `MeterListener` and one from the raw `ActivityListener`. Both run alongside the OpenTelemetry SDK console exporters, which emit per-span and per-metric output during the run.
-
 ## Layout
 
-| Path | Purpose |
-|------|---------|
-| `src/Qyl.Playground/` | The runnable demo: instruments, listeners, OTel wiring, endpoints. |
-| `tests/Qyl.Playground.Tests/` | Integration tests that exercise producer + in-process listener together. |
-| `Qyl.Playground.slnx` | XML-format solution. Use this with `dotnet build` / `dotnet test`. |
+```
+src/Qyl.Playground/
+├── Agents/              the simulated workload
+├── Telemetry/
+│   ├── Metrics/         Meter + MeterListener
+│   ├── Tracing/         ActivitySource + ActivityListener
+│   ├── Propagation/     W3C TraceContext + baggage
+│   └── Exporters/       OpenTelemetry SDK wiring
+└── Hosting/             background services + entry point
+```
 
-## Architectural conventions
+All files use the flat `Qyl.Playground` namespace regardless of folder. This is on purpose — the lab reads link-to-definition rather than alphabetically.
 
-These choices are intentional. Don't "fix" them without checking the rationale first.
+## Conventions
 
-- **Raw `System.Diagnostics.Metrics` APIs, no `[Counter<T>]` source generator.** The generator from `Microsoft.Extensions.Telemetry.Abstractions` adds boilerplate, requires `#pragma` for `Unit`, and calls `enum.ToString()` (slow). The hand-rolled tag-struct pattern in `AgentMetricTags.cs` covers the strongly-typed-tags use case better.
-- **Bounded tag values via enum + `ToTagValue()` extensions** (e.g. `AgentScenario.cs:27`). Never use `enum.ToString()` for tag values.
-- **OpenTelemetry GenAI semantic conventions** for AI workload spans. Constants live in `GenAiConventions.cs`. New AI-related attributes go through that file, not as inline string literals.
-- **Two parallel consumption channels are intentional.** `AgentMetricListener` / `AgentActivityListener` use the raw `MeterListener` / `ActivityListener` APIs (educational). The OpenTelemetry SDK runs alongside via `AddOpenTelemetry()` (production realism). The same `Meter` / `ActivitySource` feeds both — they do not contend.
-- **`System.Threading.Lock` instead of `object` for lock targets** (.NET 9+ runtime path).
-- **`[LoggerMessage]` for structured logging on the hot path.** Don't go back to `ILogger.LogInformation(string, params object?[])` for the snapshot tick — it boxes every value-type arg.
-- **Tier 4 production concerns are demonstrated, not glossed over.** `BaggageLimits` enforces W3C baggage caps; `TraceContextPropagation` provides W3C inject/extract for non-HTTP transports.
+These are deliberate choices, not oversights. Verify the rationale before changing them.
 
-## Span hierarchy emitted per agent run
+- Use the raw `System.Diagnostics.Metrics` APIs. The `[Counter<T>]` source generator from `Microsoft.Extensions.Telemetry.Abstractions` hides the API and forces `enum.ToString()` for tag values.
+- Tag values come from enums via `ToTagValue()` extension methods (see `Agents/AgentScenario.cs`). Never call `enum.ToString()` on the hot path.
+- OpenTelemetry GenAI semantic-convention attribute names live in `Telemetry/GenAiConventions.cs`. Don't inline `gen_ai.*` strings elsewhere.
+- The raw `MeterListener` / `ActivityListener` and the OpenTelemetry SDK both run. The same `Meter` and `ActivitySource` feed both — they don't contend.
+- Lock targets use `System.Threading.Lock` (.NET 9+), not `object`.
+- Hot-path logging uses `[LoggerMessage]` partial methods, not `ILogger.LogInformation(string, params object?[])`.
+- `BaggageLimits.TryAddBaggage` enforces W3C baggage caps. The .NET runtime does not. Use it instead of `Activity.AddBaggage` directly.
+- `TraceContextPropagation.Inject` / `.Extract` handles W3C propagation for non-HTTP transports.
+
+## Span shape per agent run
 
 ```
-invoke_agent {scenario}       ActivityKind.Internal  (root)
-├── chat {model}              ActivityKind.Client     (LLM round)
+invoke_agent {scenario}       Internal   (root)
+├── chat {model}              Client     (LLM call)
 │   └── event: gen_ai.choice
-└── execute_tool {tool}       ActivityKind.Internal   (1..4 children, wraps simulated work)
+└── execute_tool {tool}       Internal   (1..4 children)
 ```
 
-The root span carries cumulative `gen_ai.usage.input_tokens` / `output_tokens`, `gen_ai.response.finish_reasons`, `agent.outcome`, and an `ActivityStatusCode` derived from the outcome.
+The root span carries cumulative token usage, `gen_ai.response.finish_reasons`, `agent.outcome`, and an `ActivityStatusCode` derived from the outcome.
 
-## What this repo is NOT
+## Exporter selection
 
-- Not a production observability framework. For production, swap `AddConsoleExporter()` for `AddOtlpExporter()` and drop the raw listeners.
-- Not a tutorial for `dotnet-counters` — the `Meter` is exposed by name (`Qyl.Playground.AgentRuntime`) so `dotnet-counters monitor -n Qyl.Playground --counters Qyl.Playground.AgentRuntime` works, but the focus is in-process consumption + OTel pipeline.
-- Not coupled to any external blog series or upstream sample.
+Picked automatically by `OpenTelemetryExtensions.AddPlaygroundOpenTelemetry`:
+
+- `OTEL_EXPORTER_OTLP_ENDPOINT` set → OTLP.
+- Development + no OTLP + no live dashboard → Console.
+- Production + no OTLP → none.
+
+The Spectre dashboard owns stdout when active, so the Console exporter is suppressed in that case.
+
+## What this is not
+
+A production observability framework. The raw listeners are for reading and learning. The OpenTelemetry pipeline is the production path — set `OTEL_EXPORTER_OTLP_ENDPOINT` to a collector address and drop the raw listeners.
