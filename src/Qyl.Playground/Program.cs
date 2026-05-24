@@ -1,9 +1,5 @@
 using System.Diagnostics;
 using Qyl.Playground;
-using OpenTelemetry;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 
 var options = DemoOptions.FromArgs(args);
 
@@ -16,29 +12,25 @@ builder.Services.AddSingleton<AgentRunService>();
 builder.Services.AddSingleton<AgentMetricListener>();
 builder.Services.AddSingleton<AgentActivityListener>();
 
-// OpenTelemetry SDK: parallel pipeline that exports both metrics and traces,
-// applying GenAI semantic conventions to the AI workload spans.
-// AlwaysOnSampler is fine for a demo; production would use ParentBasedSampler
-// or TraceIdRatioBasedSampler to cap volume.
-builder.Services
-    .AddOpenTelemetry()
-    .ConfigureResource(r => r.AddService(
-        serviceName: "Qyl.Playground",
-        serviceVersion: AgentActivitySource.Version))
-    .WithMetrics(m => m
-        .AddMeter(AgentWorkflowMetrics.MeterName)
-        .AddConsoleExporter())
-    .WithTracing(t => t
-        .AddSource(AgentActivitySource.Name)
-        .SetSampler(new AlwaysOnSampler())
-        .AddConsoleExporter());
+// Env-aware OTel wiring: Console exporter in Development (suppressed when the
+// live dashboard owns stdout), OTLP exporter whenever OTEL_EXPORTER_OTLP_ENDPOINT
+// is set. No code edits needed when switching environments.
+builder.Services.AddPlaygroundOpenTelemetry(builder.Environment, options);
 
 if (options.RunBoundedDemo)
 {
     builder.Services.AddHostedService<DemoRunnerService>();
 }
 
-if (options.EnablePeriodicReporter)
+// Mutually exclusive reporters: the Spectre live dashboard owns the terminal
+// when stdout is a TTY, otherwise the periodic ILogger reporter prints
+// structured snapshots for piped / CI runs.
+if (options.EnableLiveDashboard)
+{
+    builder.Services.AddHostedService<LiveDashboardService>();
+    builder.Logging.ClearProviders();
+}
+else if (options.EnablePeriodicReporter)
 {
     builder.Services.AddHostedService<MetricReporterService>();
 }

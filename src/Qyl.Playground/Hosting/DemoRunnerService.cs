@@ -31,12 +31,17 @@ public sealed partial class DemoRunnerService(
         }
         finally
         {
-            Console.WriteLine();
-            Console.WriteLine("Final in-process metric snapshot");
-            Console.WriteLine(MetricSnapshotFormatter.Format(listener.GetSnapshot()));
-            Console.WriteLine();
-            Console.WriteLine("Final in-process trace snapshot");
-            Console.WriteLine(TraceSnapshotFormatter.Format(traceListener.GetSnapshot()));
+            // Spectre's Live() owns the terminal when the dashboard is active —
+            // writing snapshots here would corrupt the rendered UI.
+            if (!options.EnableLiveDashboard)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Final in-process metric snapshot");
+                Console.WriteLine(MetricSnapshotFormatter.Format(listener.GetSnapshot()));
+                Console.WriteLine();
+                Console.WriteLine("Final in-process trace snapshot");
+                Console.WriteLine(TraceSnapshotFormatter.Format(traceListener.GetSnapshot()));
+            }
             lifetime.StopApplication();
         }
     }
