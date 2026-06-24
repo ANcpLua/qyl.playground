@@ -2,6 +2,7 @@ using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Qyl.OpenTelemetry.AutoInstrumentation;
 
 namespace Qyl.Playground;
 
@@ -38,6 +39,7 @@ public static class OpenTelemetryExtensions
             .WithTracing(t =>
             {
                 t.AddSource(AgentActivitySource.Name)
+                 .AddSource(QylActivitySource.Name) // zero-code spans from the Qyl auto-instrumentation stack
                  .SetSampler(new AlwaysOnSampler());
                 if (useConsole) t.AddConsoleExporter();
                 if (useOtlp) t.AddOtlpExporter();

@@ -1,31 +1,36 @@
+using Qyl.OpenTelemetry.SemanticConventions.Incubating.Attributes.GenAi;
+
 namespace Qyl.Playground;
 
-// OpenTelemetry GenAI semantic conventions.
-// Spec: https://opentelemetry.io/docs/specs/semconv/gen-ai/
-// Stable as of OTel semantic conventions 1.34 (2025-2026).
+// GenAI semconv keys, sourced from Qyl.OpenTelemetry.SemanticConventions (Weaver-generated,
+// OTel semconv 1.41.0). This facade is the single binding point to the package — the playground
+// holds no gen_ai.* string literals of its own. Every value below is a compile-time alias of a
+// package constant, so callers and switch `case` labels keep working unchanged.
 public static class GenAiConventions
 {
-    public const string System = "gen_ai.system";
-    public const string OperationName = "gen_ai.operation.name";
-    public const string RequestModel = "gen_ai.request.model";
-    public const string ResponseModel = "gen_ai.response.model";
-    public const string UsageInputTokens = "gen_ai.usage.input_tokens";
-    public const string UsageOutputTokens = "gen_ai.usage.output_tokens";
-    public const string ResponseFinishReasons = "gen_ai.response.finish_reasons";
+    // gen_ai.system is deprecated upstream in favor of gen_ai.provider.name; use the current key.
+    public const string ProviderName = GenAiAttributes.ProviderName;
+    public const string OperationName = GenAiAttributes.OperationName;
+    public const string RequestModel = GenAiAttributes.RequestModel;
+    public const string ResponseModel = GenAiAttributes.ResponseModel;
+    public const string UsageInputTokens = GenAiAttributes.UsageInputTokens;
+    public const string UsageOutputTokens = GenAiAttributes.UsageOutputTokens;
+    public const string ResponseFinishReasons = GenAiAttributes.ResponseFinishReasons;
 
-    public const string AgentName = "gen_ai.agent.name";
-    public const string AgentId = "gen_ai.agent.id";
+    public const string AgentName = GenAiAttributes.AgentName;
+    public const string AgentId = GenAiAttributes.AgentId;
 
-    public const string ToolName = "gen_ai.tool.name";
-    public const string ToolCallId = "gen_ai.tool.call.id";
-    public const string ToolType = "gen_ai.tool.type";
+    public const string ToolName = GenAiAttributes.ToolName;
+    public const string ToolCallId = GenAiAttributes.ToolCallId;
+    public const string ToolType = GenAiAttributes.ToolType;
 
+    // Playground identity, emitted as the gen_ai.provider.name value.
     public const string SystemName = "qyl-playground";
 
     public static class Operations
     {
-        public const string InvokeAgent = "invoke_agent";
-        public const string ExecuteTool = "execute_tool";
-        public const string Chat = "chat";
+        public const string InvokeAgent = GenAiAttributes.OperationNameValues.InvokeAgent;
+        public const string ExecuteTool = GenAiAttributes.OperationNameValues.ExecuteTool;
+        public const string Chat = GenAiAttributes.OperationNameValues.Chat;
     }
 }

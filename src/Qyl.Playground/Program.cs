@@ -1,9 +1,14 @@
 using System.Diagnostics;
+using Qyl.OpenTelemetry.AutoInstrumentation.Hosting;
 using Qyl.Playground;
 
 var options = DemoOptions.FromArgs(args);
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Qyl zero-code auto-instrumentation. The Hosting package boots itself via a buildTransitive
+// module initializer; this explicit call is the auditable, deterministic boot point.
+builder.Services.AddQylAutoInstrumentation();
 
 builder.Services.AddMetrics();
 builder.Services.AddSingleton(options);

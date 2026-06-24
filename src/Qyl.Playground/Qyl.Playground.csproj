@@ -13,4 +13,13 @@
     <PackageReference Include="Spectre.Console" Version="0.55.2" />
   </ItemGroup>
 
+  <!-- The Qyl OpenTelemetry stack (aligned at 3.0.2). SemanticConventions is the canonical
+       gen_ai.* source; AutoInstrumentation.Hosting provides zero-code instrumentation via
+       its buildTransitive module-initializer boot. -->
+  <ItemGroup>
+    <PackageReference Include="Qyl.OpenTelemetry.SemanticConventions" Version="3.0.2" />
+    <PackageReference Include="Qyl.OpenTelemetry.SemanticConventions.Incubating" Version="3.0.2" />
+    <PackageReference Include="Qyl.OpenTelemetry.AutoInstrumentation.Hosting" Version="3.0.2" />
+  </ItemGroup>
+
 </Project>
