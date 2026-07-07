@@ -24,9 +24,6 @@ public static class GenAiConventions
     public const string ToolCallId = GenAiAttributes.ToolCallId;
     public const string ToolType = GenAiAttributes.ToolType;
 
-    // Playground identity, emitted as the gen_ai.provider.name value.
-    public const string SystemName = "qyl-playground";
-
     public static class Operations
     {
         public const string InvokeAgent = GenAiAttributes.OperationNameValues.InvokeAgent;

@@ -1,7 +1,7 @@
 namespace Qyl.Playground;
 
 public sealed partial class MetricReporterService(
-    AgentMetricListener listener,
+    AgentMetricCollector listener,
     DemoOptions options,
     ILogger<MetricReporterService> logger) : BackgroundService
 {

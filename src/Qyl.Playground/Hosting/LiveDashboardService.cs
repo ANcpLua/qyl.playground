@@ -3,12 +3,8 @@ using Spectre.Console;
 
 namespace Qyl.Playground;
 
-// Live-updating console dashboard built with Spectre.Console — the modern
-// equivalent of the Andrew-Lock-Part-4 example. Only registered when stdout
-// is a TTY and --demo was passed; piped / headless runs use
-// MetricReporterService (ILogger structured output) instead.
 public sealed class LiveDashboardService(
-    AgentMetricListener metrics,
+    AgentMetricCollector metrics,
     AgentActivityListener traces,
     DemoOptions options) : BackgroundService
 {
@@ -56,7 +52,7 @@ public sealed class LiveDashboardService(
     private static Table BuildMetricsTable()
     {
         var table = new Table()
-            .Title("[bold cyan]Metrics[/]  [dim](System.Diagnostics.Metrics + MeterListener)[/]")
+            .Title("[bold cyan]Metrics[/]  [dim](OpenTelemetry SDK in-memory reader)[/]")
             .Border(TableBorder.Rounded)
             .AddColumn("Metric")
             .AddColumn("Type")
@@ -78,7 +74,7 @@ public sealed class LiveDashboardService(
     private static Table BuildTracesTable()
     {
         var table = new Table()
-            .Title("[bold magenta]Traces[/]  [dim](System.Diagnostics.Activity + ActivityListener, GenAI semconv)[/]")
+            .Title("[bold magenta]Traces[/]  [dim](ActivitySource spans, GenAI semconv)[/]")
             .Border(TableBorder.Rounded)
             .AddColumn("Counter")
             .AddColumn(new TableColumn("Value").RightAligned());

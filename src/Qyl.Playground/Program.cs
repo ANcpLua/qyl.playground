@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using OpenTelemetry;
+using OpenTelemetry.Context.Propagation;
 using Qyl.OpenTelemetry.AutoInstrumentation.Hosting;
 using Qyl.Playground;
 
@@ -14,7 +16,7 @@ builder.Services.AddMetrics();
 builder.Services.AddSingleton(options);
 builder.Services.AddSingleton<AgentWorkflowMetrics>();
 builder.Services.AddSingleton<AgentRunService>();
-builder.Services.AddSingleton<AgentMetricListener>();
+builder.Services.AddSingleton<AgentMetricCollector>();
 builder.Services.AddSingleton<AgentActivityListener>();
 
 // Env-aware OTel wiring: Console exporter in Development (suppressed when the
@@ -42,9 +44,9 @@ else if (options.EnablePeriodicReporter)
 
 var app = builder.Build();
 
-// Eagerly resolve both raw in-process listeners so they start receiving
-// events before any activity or measurement is produced.
-_ = app.Services.GetRequiredService<AgentMetricListener>();
+// Eagerly resolve the in-process metric collector and trace listener so both are
+// subscribed before any measurement or activity is produced.
+_ = app.Services.GetRequiredService<AgentMetricCollector>();
 _ = app.Services.GetRequiredService<AgentActivityListener>();
 
 app.MapGet("/", () => Results.Ok(new
@@ -87,7 +89,12 @@ app.MapGet("/agent/run-with-context", async (
         carrier["tracestate"] = tracestate;
     }
 
-    var parentContext = TraceContextPropagation.Extract(carrier);
+    var propagationContext = Propagators.DefaultTextMapPropagator.Extract(
+        default,
+        carrier,
+        static (c, key) => c.TryGetValue(key, out var value) ? new[] { value } : Array.Empty<string>());
+    var parentContext = propagationContext.ActivityContext;
+    Baggage.Current = propagationContext.Baggage;
 
     using var consumerActivity = AgentActivitySource.Instance.StartActivity(
         "agent.consume",
@@ -115,10 +122,13 @@ app.MapGet("/agent/propagation-headers", () =>
     using var demoActivity = AgentActivitySource.Instance.StartActivity(
         "propagation.demo",
         ActivityKind.Producer);
-    BaggageLimits.TryAddBaggage(demoActivity, "agent.session.id", Guid.NewGuid().ToString("N"));
+    Baggage.Current = Baggage.Current.SetBaggage("agent.session.id", Guid.NewGuid().ToString("N"));
 
     var headers = new Dictionary<string, string>();
-    TraceContextPropagation.Inject(Activity.Current, headers);
+    Propagators.DefaultTextMapPropagator.Inject(
+        new PropagationContext(Activity.Current?.Context ?? default, Baggage.Current),
+        headers,
+        static (c, key, value) => c[key] = value);
     return Results.Ok(new
     {
         attach_to_outbound_message = headers,
@@ -128,8 +138,8 @@ app.MapGet("/agent/propagation-headers", () =>
     });
 });
 
-app.MapGet("/metrics/snapshot", (AgentMetricListener listener) =>
-    Results.Ok(listener.GetSnapshot()));
+app.MapGet("/metrics/snapshot", (AgentMetricCollector collector) =>
+    Results.Ok(collector.GetSnapshot()));
 
 app.MapGet("/metrics/definitions", (AgentWorkflowMetrics metrics) =>
     Results.Ok(metrics.Definitions));

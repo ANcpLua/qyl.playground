@@ -1,4 +1,3 @@
-using Qyl.Playground;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Qyl.Playground.Tests;
@@ -10,7 +9,7 @@ public sealed class AgentMetricsIntegrationTests
     {
         await using var provider = CreateProvider();
         var runs = provider.GetRequiredService<AgentRunService>();
-        var listener = provider.GetRequiredService<AgentMetricListener>();
+        var listener = provider.GetRequiredService<AgentMetricCollector>();
         var request = new AgentRunRequest(AgentScenario.Coding, AgentModel.Frontier);
 
         for (var i = 0; i < 8; i++)
@@ -54,7 +53,7 @@ public sealed class AgentMetricsIntegrationTests
         var services = new ServiceCollection();
         services.AddMetrics();
         services.AddSingleton<AgentWorkflowMetrics>();
-        services.AddSingleton<AgentMetricListener>();
+        services.AddSingleton<AgentMetricCollector>();
         services.AddSingleton<AgentRunService>();
 
         return services.BuildServiceProvider(validateScopes: true);

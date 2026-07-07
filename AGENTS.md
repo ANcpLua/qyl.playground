@@ -10,16 +10,22 @@ dotnet test  Qyl.Playground.slnx --no-build
 dotnet run   --project src/Qyl.Playground -- --demo --duration 6 --parallelism 4
 ```
 
+## The stack
+
+The playground is built **on** the Qyl.OpenTelemetry stack (aligned at 3.0.2). There is no hand-rolled telemetry plumbing — the OpenTelemetry SDK collects and exports, and the app only defines its own agent-domain instruments.
+
+- `Qyl.OpenTelemetry.SemanticConventions(.Incubating)` — the canonical source of `gen_ai.*` and other attribute keys (Weaver-generated, OTel semconv 1.41.0).
+- `Qyl.OpenTelemetry.AutoInstrumentation.Hosting` — zero-code instrumentation, booted explicitly via `AddQylAutoInstrumentation()`; its spans flow from `QylActivitySource` and are exported alongside the app's own.
+
 ## Layout
 
 ```
 src/Qyl.Playground/
 ├── Agents/              the simulated workload
 ├── Telemetry/
-│   ├── Metrics/         Meter + MeterListener
-│   ├── Tracing/         ActivitySource + ActivityListener
-│   ├── Propagation/     W3C TraceContext + baggage
-│   └── Exporters/       OpenTelemetry SDK wiring
+│   ├── Metrics/         agent-domain Meter + SDK in-memory reader
+│   ├── Tracing/         agent-domain ActivitySource + thin span listener
+│   └── Exporters/       OpenTelemetry SDK + Qyl stack wiring
 └── Hosting/             background services + entry point
 ```
 
@@ -29,14 +35,13 @@ All files use the flat `Qyl.Playground` namespace regardless of folder. This is 
 
 These are deliberate choices, not oversights. Verify the rationale before changing them.
 
-- Use the raw `System.Diagnostics.Metrics` APIs. The `[Counter<T>]` source generator from `Microsoft.Extensions.Telemetry.Abstractions` hides the API and forces `enum.ToString()` for tag values.
+- The app defines its own agent-domain instruments with the raw `System.Diagnostics.Metrics` API (`Meter`, `Counter<T>`, `Histogram<T>`). The `[Counter<T>]` source generator from `Microsoft.Extensions.Telemetry.Abstractions` hides the API and forces `enum.ToString()` for tag values — don't use it. Library-level signals come from the Qyl auto-instrumentation, not from here.
 - Tag values come from enums via `ToTagValue()` extension methods (see `Agents/AgentScenario.cs`). Never call `enum.ToString()` on the hot path.
-- OpenTelemetry GenAI semantic-convention attribute names live in `Telemetry/GenAiConventions.cs`. Don't inline `gen_ai.*` strings elsewhere.
-- The raw `MeterListener` / `ActivityListener` and the OpenTelemetry SDK both run. The same `Meter` and `ActivitySource` feed both — they don't contend.
+- `gen_ai.*` and other semantic-convention keys come from the `Qyl.OpenTelemetry.SemanticConventions` package through the `Telemetry/GenAiConventions.cs` facade — the single binding point. Never inline `gen_ai.*` string literals. `gen_ai.provider.name` is the model provider (openai/anthropic/…), not the app — the app is identified by `service.name`.
+- The in-process dashboard reads metrics through a dedicated OpenTelemetry SDK in-memory reader (`AgentMetricCollector`) and spans through a thin `ActivityListener` (`AgentActivityListener`) — the same pattern the stack's own `LiveInstrumentationDemo` uses. The exported telemetry runs through the SDK in parallel.
+- Non-HTTP context propagation uses the stack's `CompositeTextMapPropagator` (W3C TraceContext + Baggage) via `Propagators.DefaultTextMapPropagator`. HTTP ingress/egress is propagated automatically by the instrumentation.
 - Lock targets use `System.Threading.Lock` (.NET 9+), not `object`.
 - Hot-path logging uses `[LoggerMessage]` partial methods, not `ILogger.LogInformation(string, params object?[])`.
-- `BaggageLimits.TryAddBaggage` enforces W3C baggage caps. The .NET runtime does not. Use it instead of `Activity.AddBaggage` directly.
-- `TraceContextPropagation.Inject` / `.Extract` handles W3C propagation for non-HTTP transports.
 
 ## Span shape per agent run
 
@@ -57,8 +62,4 @@ Picked automatically by `OpenTelemetryExtensions.AddPlaygroundOpenTelemetry`:
 - Development + no OTLP + no live dashboard → Console.
 - Production + no OTLP → none.
 
-The Spectre dashboard owns stdout when active, so the Console exporter is suppressed in that case.
-
-## What this is not
-
-A production observability framework. The raw listeners are for reading and learning. The OpenTelemetry pipeline is the production path — set `OTEL_EXPORTER_OTLP_ENDPOINT` to a collector address and drop the raw listeners.
+The Spectre dashboard owns stdout when active, so the Console exporter is suppressed in that case. Either way the in-process dashboard and `/metrics/snapshot` read through the SDK in-memory reader, independent of the export path.

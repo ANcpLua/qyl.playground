@@ -2,7 +2,7 @@ namespace Qyl.Playground;
 
 public sealed partial class DemoRunnerService(
     AgentRunService runs,
-    AgentMetricListener listener,
+    AgentMetricCollector listener,
     AgentActivityListener traceListener,
     DemoOptions options,
     IHostApplicationLifetime lifetime,

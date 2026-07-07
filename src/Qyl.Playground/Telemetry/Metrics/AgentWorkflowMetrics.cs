@@ -128,13 +128,12 @@ public sealed class AgentWorkflowMetrics
 
         if (activity is not null)
         {
-            activity.SetTag(GenAiConventions.ProviderName, GenAiConventions.SystemName);
             activity.SetTag(GenAiConventions.OperationName, GenAiConventions.Operations.InvokeAgent);
             activity.SetTag(GenAiConventions.AgentName, request.Scenario.ToTagValue());
             activity.SetTag(GenAiConventions.RequestModel, request.Model.ToTagValue());
             activity.SetTag("agent.scenario", request.Scenario.ToTagValue());
             activity.SetTag("ai.model", request.Model.ToTagValue());
-            BaggageLimits.TryAddBaggage(activity, "agent.session.id", Guid.NewGuid().ToString("N"));
+            activity.SetBaggage("agent.session.id", Guid.NewGuid().ToString("N"));
         }
 
         return new ActiveTurnScope(this, request, Stopwatch.GetTimestamp(), activity);
@@ -148,7 +147,6 @@ public sealed class AgentWorkflowMetrics
 
         if (activity is not null)
         {
-            activity.SetTag(GenAiConventions.ProviderName, GenAiConventions.SystemName);
             activity.SetTag(GenAiConventions.OperationName, GenAiConventions.Operations.Chat);
             activity.SetTag(GenAiConventions.RequestModel, request.Model.ToTagValue());
             activity.SetTag(GenAiConventions.ResponseModel, request.Model.ToTagValue());
@@ -169,7 +167,6 @@ public sealed class AgentWorkflowMetrics
 
         if (activity is not null)
         {
-            activity.SetTag(GenAiConventions.ProviderName, GenAiConventions.SystemName);
             activity.SetTag(GenAiConventions.OperationName, GenAiConventions.Operations.ExecuteTool);
             activity.SetTag(GenAiConventions.ToolName, tool.ToTagValue());
             activity.SetTag(GenAiConventions.ToolCallId, Guid.NewGuid().ToString("N"));
